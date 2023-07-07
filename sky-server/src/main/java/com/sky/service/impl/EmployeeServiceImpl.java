@@ -1,17 +1,28 @@
 package com.sky.service.impl;
 
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import com.sky.constant.MessageConstant;
+import com.sky.constant.PasswordConstant;
 import com.sky.constant.StatusConstant;
+import com.sky.context.BaseContext;
+import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
+import com.sky.dto.EmployeePageQueryDTO;
 import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
 import com.sky.exception.PasswordErrorException;
 import com.sky.mapper.EmployeeMapper;
+import com.sky.result.PageResult;
 import com.sky.service.EmployeeService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
@@ -38,8 +49,10 @@ public class EmployeeServiceImpl implements EmployeeService {
             throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
+
         //密码比对
-        // TODO 后期需要进行md5加密，然后再进行比对
+        // 进行md5加密与数据库比较
+        password = DigestUtils.md5DigestAsHex(password.getBytes());
         if (!password.equals(employee.getPassword())) {
             //密码错误
             throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
@@ -52,6 +65,45 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         //3、返回实体对象
         return employee;
+    }
+
+
+    public void addEmp(EmployeeDTO employeeDTO) {
+        //传给持久层最好用实体对象而不是DTO
+        Employee emp = new Employee();
+        BeanUtils.copyProperties(employeeDTO, emp);
+        //首先要保证员工的账号唯一
+
+        //设置好emp剩余属性
+        emp.setStatus(StatusConstant.ENABLE);
+        //默认密码是123456,为密码加密然后存入数据库
+        emp.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()));
+        emp.setCreateTime(LocalDateTime.now());
+        emp.setUpdateTime(LocalDateTime.now());
+        emp.setCreateUser(BaseContext.getCurrentId());
+        emp.setUpdateUser(BaseContext.getCurrentId());
+
+
+        employeeMapper.insertEmp(emp);
+    }
+
+    /**
+     * @param employeePageQueryDTO:
+     * @return PageResult
+     * @author richard
+     * @description TODO
+     * @date 2023/7/7 09:54
+     */
+    public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
+
+        //开始分页查询
+        PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
+
+        Page<Employee> pp = employeeMapper.pageQuery(employeePageQueryDTO);
+        long total = pp.getTotal();
+        List<Employee> records = pp.getResult();
+
+        return new PageResult(total, records);
     }
 
 }
